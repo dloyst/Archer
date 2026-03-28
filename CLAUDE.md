@@ -112,6 +112,46 @@ To fire locally:   bash .archer/quivers/precision-health.sh
 To add to pipeline: /archer export
 ```
 
+### Step 5 — Suggest Defensive Quivers
+After the armory is stocked, offer a second wave. These test how well the fortress *handles failure* — not just that it works under normal conditions.
+
+Based on what you learned during scouting, propose relevant defensive quivers from these categories:
+
+**Input validation** (`trick-input-validation.sh`) — Send bad payloads and confirm the service rejects them gracefully (400/422, not 500).
+- Missing required fields
+- Invalid enum values
+- Wrong field types
+- Empty body
+
+**Auth boundary** (`trick-auth-boundary.sh`) — Confirm the guardian actually guards.
+- Requests with no auth header → expect 401/403
+- Requests with a deliberately wrong credential
+- Only suggest this if auth was detected during scouting
+
+**Not found** (`trick-not-found.sh`) — Probe 404 handling.
+- GET/DELETE on IDs that don't exist
+- Double-delete: delete the same resource twice, confirm second returns 404 not 500
+
+**Boundary inputs** (`trick-boundary-inputs.sh`) — Probe with extreme values.
+- Integer fields at 0, -1, MAX_INT/MAX_LONG
+- String fields at extreme lengths
+- Only suggest fields where the schema gives you enough info to be specific
+
+Keep the suggestion concise. Not every service warrants all four — use your scouting knowledge to recommend only what's relevant. Example:
+
+```
+The armory is stocked. Want to go deeper?
+
+I can also craft defensive quivers that test how the fortress handles failure:
+  • trick-input-validation  — do bad payloads return 400/422, or does the fortress panic?
+  • trick-auth-boundary     — is the api_key gate real, or decorative?
+  • trick-not-found         — does deleting a ghost return 404, or something worse?
+
+Want any of these? I can craft all, some, or none.
+```
+
+Wait for the operator's response before crafting. These are optional — don't add them to the armory without confirmation.
+
 ---
 
 ## The Armory
@@ -123,6 +163,7 @@ All generated quivers live in `.archer/quivers/` inside the **target repository*
 - `volley-[entity]-crud.sh` — CRUD workflow
 - `barrage-[endpoint]-read.sh` — load test
 - `sustained-[endpoint]-write.sh` — stress test
+- `trick-[scenario].sh` — defensive tests (bad inputs, auth boundaries, edge cases)
 
 **Script requirements:**
 - Must be self-contained bash
@@ -142,12 +183,24 @@ All generated quivers live in `.archer/quivers/` inside the **target repository*
 #!/usr/bin/env bash
 # ============================================================
 # Quiver: [quiver-name]
-# Type:   [precision | volley | barrage | sustained]
+# Type:   [precision | volley | barrage | sustained | trick]
 # Target: [service-name]
 # Crafted by Archer on [date]
 # ============================================================
 
 set -euo pipefail
+
+# --- PORTABILITY ---
+# ms_now: returns current time in milliseconds — works on macOS and Linux
+ms_now() {
+  if command -v gdate &>/dev/null; then
+    gdate +%s%3N
+  elif command -v python3 &>/dev/null; then
+    python3 -c "import time; print(int(time.time() * 1000))"
+  else
+    echo $(($(date +%s) * 1000))
+  fi
+}
 
 # --- TARGET ---
 BASE_URL="${SERVICE_URL:-https://[detected-default-url]}"
@@ -172,7 +225,11 @@ echo "🏷️  Namespace: $ARCHER_NS"
 echo ""
 
 # --- ARROWS ---
-# ... curl commands ...
+# Time each arrow:
+#   START=$(ms_now)
+#   ... curl ...
+#   DURATION=$(( $(ms_now) - START ))
+#   echo "  ✅ $STATUS (${DURATION}ms)"
 
 echo ""
 echo "🎯 Quiver complete."
@@ -194,6 +251,12 @@ Each arrow should print:
 → [METHOD] [path]
   ✅ [status] ([duration]ms)   # or ❌ [status] — [error]
 ```
+
+### Portability rules
+Always write scripts that work on both macOS (BSD tools) and Linux (GNU tools):
+- **Never use `date +%s%3N`** — BSD date doesn't support milliseconds. Use the `ms_now()` helper above.
+- **Never use `head -n -1`** — BSD head doesn't support negative counts. Use `sed '$d'` to drop the last line.
+- Use `#!/usr/bin/env bash`, not `#!/bin/bash` — more portable across environments.
 
 ### Auth handling rules
 - **Always** use env vars. Never suggest hardcoding.
@@ -228,6 +291,14 @@ Constant rate fire over a duration. Purpose: trigger autoscaling, find memory le
 - Configurable: `RATE_PER_SEC`, `DURATION_SECS`
 - Default: 10 RPS for 60 seconds
 - Report: rolling status every 10 seconds, final summary
+
+### Trick (`trick-*.sh`)
+Defensive arrows — test how the fortress handles failure, not just success. Suggested after the initial armory is stocked (see Step 5).
+- **Input validation**: bad payloads, missing fields, invalid enums → expect 400/422, not 500
+- **Auth boundary**: no credentials, wrong credentials → expect 401/403
+- **Not found**: nonexistent IDs, double-delete → expect 404
+- **Boundary inputs**: extreme values (0, -1, MAX_INT, empty strings, huge strings)
+- Trick quivers expect *failure responses* — a 400 is a ✅, a 500 is a ❌
 
 ---
 

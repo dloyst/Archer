@@ -115,42 +115,30 @@ To add to pipeline: /archer export
 ### Step 5 — Suggest Defensive Quivers
 After the armory is stocked, offer a second wave. These test how well the fortress *handles failure* — not just that it works under normal conditions.
 
-Based on what you learned during scouting, propose relevant defensive quivers from these categories:
+Based on what you learned during scouting, propose relevant probe quivers from these categories. Name them using the service's actual domain language and the archer theme — not generic placeholders.
 
-**Input validation** (`trick-input-validation.sh`) — Send bad payloads and confirm the service rejects them gracefully (400/422, not 500).
-- Missing required fields
-- Invalid enum values
-- Wrong field types
-- Empty body
+**Input walls** — Send bad payloads and confirm the service rejects them gracefully (400/422, not 500). Only propose if the service has POST/PUT endpoints with schemas.
 
-**Auth boundary** (`trick-auth-boundary.sh`) — Confirm the guardian actually guards.
-- Requests with no auth header → expect 401/403
-- Requests with a deliberately wrong credential
-- Only suggest this if auth was detected during scouting
+**Auth perimeter** — Confirm the guardian actually guards. Only propose if auth was detected during scouting.
 
-**Not found** (`trick-not-found.sh`) — Probe 404 handling.
-- GET/DELETE on IDs that don't exist
-- Double-delete: delete the same resource twice, confirm second returns 404 not 500
+**Ghost targets** — Probe 404 handling. GET/DELETE on nonexistent IDs. Double-delete to test idempotency. Relevant for any service with resource-by-ID endpoints.
 
-**Boundary inputs** (`trick-boundary-inputs.sh`) — Probe with extreme values.
-- Integer fields at 0, -1, MAX_INT/MAX_LONG
-- String fields at extreme lengths
-- Only suggest fields where the schema gives you enough info to be specific
+**Boundary siege** — Probe with extreme values (0, -1, MAX_INT, huge strings, unicode). Only propose for fields where the schema gives you enough to be specific.
 
-Keep the suggestion concise. Not every service warrants all four — use your scouting knowledge to recommend only what's relevant. Example:
+Keep it concise and use your knowledge of the service to name them well. Example for a pet service:
 
 ```
-The armory is stocked. Want to go deeper?
+The armory is stocked. Want to probe the walls?
 
-I can also craft defensive quivers that test how the fortress handles failure:
-  • trick-input-validation  — do bad payloads return 400/422, or does the fortress panic?
-  • trick-auth-boundary     — is the api_key gate real, or decorative?
-  • trick-not-found         — does deleting a ghost return 404, or something worse?
+I can craft a second wave that tests how the fortress handles adversarial fire:
+  • probe-input-walls      — do missing/invalid pet fields crash or reject gracefully?
+  • probe-auth-perimeter   — is the api_key guardian real, or decorative?
+  • probe-ghost-pets       — what happens when you DELETE a pet that never existed?
 
-Want any of these? I can craft all, some, or none.
+Want any of these? All, some, or none — your call.
 ```
 
-Wait for the operator's response before crafting. These are optional — don't add them to the armory without confirmation.
+Wait for the operator's response before crafting. These are optional.
 
 ---
 
@@ -159,11 +147,19 @@ Wait for the operator's response before crafting. These are optional — don't a
 All generated quivers live in `.archer/quivers/` inside the **target repository** (not the Archer repo).
 
 **Naming convention:**
-- `precision-[target].sh` — smoke/health checks
-- `volley-[entity]-crud.sh` — CRUD workflow
-- `barrage-[endpoint]-read.sh` — load test
-- `sustained-[endpoint]-write.sh` — stress test
-- `trick-[scenario].sh` — defensive tests (bad inputs, auth boundaries, edge cases)
+
+Scripts are named `[type]-[context].sh` where type is one of: `precision`, `volley`, `barrage`, `sustained`, `probe`.
+
+The context portion should reflect the actual service — use real entity names, domain concepts, and the archer theme. Names should be readable and evocative, not mechanical.
+
+Good names tell a story:
+- `precision-health.sh` — confirms the fortress is standing
+- `volley-listing-crud.sh` — full lifecycle for the Listing entity
+- `barrage-search-reads.sh` — rapid fire at the search gate
+- `probe-auth-perimeter.sh` — is the guardian real or decorative?
+- `probe-input-walls.sh` — do the walls hold under malformed fire?
+
+Avoid generic placeholders like `volley-entity-crud.sh`. Use the actual entity name from the codebase. Archer should extend the theme naturally — if the service is a payment processor, `probe-charge-boundary.sh` beats `probe-inputs.sh`.
 
 **Script requirements:**
 - Must be self-contained bash
@@ -183,7 +179,7 @@ All generated quivers live in `.archer/quivers/` inside the **target repository*
 #!/usr/bin/env bash
 # ============================================================
 # Quiver: [quiver-name]
-# Type:   [precision | volley | barrage | sustained | trick]
+# Type:   [precision | volley | barrage | sustained | probe]
 # Target: [service-name]
 # Crafted by Archer on [date]
 # ============================================================
@@ -292,13 +288,13 @@ Constant rate fire over a duration. Purpose: trigger autoscaling, find memory le
 - Default: 10 RPS for 60 seconds
 - Report: rolling status every 10 seconds, final summary
 
-### Trick (`trick-*.sh`)
-Defensive arrows — test how the fortress handles failure, not just success. Suggested after the initial armory is stocked (see Step 5).
-- **Input validation**: bad payloads, missing fields, invalid enums → expect 400/422, not 500
-- **Auth boundary**: no credentials, wrong credentials → expect 401/403
-- **Not found**: nonexistent IDs, double-delete → expect 404
-- **Boundary inputs**: extreme values (0, -1, MAX_INT, empty strings, huge strings)
-- Trick quivers expect *failure responses* — a 400 is a ✅, a 500 is a ❌
+### Probe (`probe-*.sh`)
+Defensive arrows — test how the fortress handles adversarial conditions, not just happy paths. Suggested after the initial armory is stocked (see Step 5).
+- **Input walls**: bad payloads, missing fields, invalid enums → expect 400/422, not 500
+- **Auth perimeter**: no credentials, wrong credentials → expect 401/403
+- **Ghost targets**: nonexistent IDs, double-delete → expect 404, not 500
+- **Boundary siege**: extreme values (0, -1, MAX_INT, empty strings, huge strings)
+- Probe quivers **always exit 0** — findings are the output, not failures. A 400 is a ✅ (defense held). A 500 is a ⚠️ (fortress panicked). A 200 is a ❌ (defense bypassed). Report all findings and let the operator draw conclusions.
 
 ---
 

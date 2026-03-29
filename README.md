@@ -30,18 +30,25 @@ Scripts are plain bash + curl. No dependencies. Drop them in any CI pipeline, ru
 
 ## Getting Started
 
-**Requirements:** Any AI agent that reads `CLAUDE.md` (Claude Code, Cursor, etc.)
+**Requirements:** [Claude Code](https://claude.ai/code) (or any agent that reads `.claude/commands/`)
+
+**Install Archer** — one time, any machine:
 
 ```bash
-# 1. Clone Archer
-git clone https://github.com/your-handle/archer ~/Archer
+mkdir -p ~/.claude/commands
+curl -fsSL https://raw.githubusercontent.com/dloyst/Archer/main/.claude/commands/archer.md \
+  -o ~/.claude/commands/archer.md
+```
 
-# 2. Open your agent in the Archer directory
-cd ~/Archer
-claude          # or your agent of choice
+That's it. `/archer` is now available in every Claude session. No repo to clone, no directory to remember.
 
-# 3. Scout your service
-/archer prep ~/Code/my-service
+**Scout your first service:**
+
+```bash
+cd ~/Code/my-service
+claude
+
+> /archer prep .
 ```
 
 Archer will brief you on what it found, propose a quiver lineup, and wait for your go-ahead before crafting anything.

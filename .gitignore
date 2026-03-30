@@ -12,3 +12,6 @@ Thumbs.db
 /tmp/
 *.tmp
 archer_response.json
+
+# Local session notes — not committed
+SESSIONS.md
